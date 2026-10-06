@@ -20,9 +20,9 @@ export default function LessonPreview() {
   const queryClient = useQueryClient();
   const [decliningWords, setDecliningWords] = useState<Set<number>>(new Set());
   const [startError, setStartError] = useState<string | null>(null);
-
   const startLessonMutation = useStartLesson();
 
+  // <-- ДОБАВЛЕНО: извлекаем refetch из useQuery
   const { data: preview, isLoading, error, refetch } = useQuery({
     queryKey: ['lessonPreview'],
     queryFn: apiClient.getLessonPreview,
@@ -48,20 +48,24 @@ export default function LessonPreview() {
   const handleStartLesson = async () => {
     console.log('[LessonPreview] 🚀 Кнопка "Начать урок" нажата');
     setStartError(null);
-
+    
     try {
-      if (!preview) {
-        console.warn('[LessonPreview] ❌ preview is null');
+      // 1. ПРИНУДИТЕЛЬНО запрашиваем свежие данные с бэкенда прямо перед стартом
+      const freshPreview = await refetch().then(res => res.data);
+      
+      if (!freshPreview) {
+        console.warn('[LessonPreview] ❌ preview is null after refetch');
         return;
       }
 
+      // 2. Берем word_ids ТОЛЬКО из свежих данных
       const wordIds = [
-        ...(preview.due_words?.map(w => w.word_id) || []),
-        ...(preview.new_words?.map(w => w.word_id) || []),
+        ...(freshPreview.due_words?.map(w => w.word_id) || []),
+        ...(freshPreview.new_words?.map(w => w.word_id) || []),
       ];
 
-      console.log('[LessonPreview] 📦 wordIds для отправки:', wordIds);
-
+      console.log('[LessonPreview] 📦 wordIds для отправки (FRESH):', wordIds);
+      
       if (wordIds.length === 0) {
         setStartError('Нет слов для начала урока.');
         return;
@@ -77,15 +81,12 @@ export default function LessonPreview() {
 
       console.log('[LessonPreview] 🔑 Idempotency-Key:', idempotencyKey);
       console.log('[LessonPreview] ⏳ Отправляем запрос на backend (ожидание LLM)...');
-
+      
       const response = await startLessonMutation.mutateAsync({ wordIds, idempotencyKey });
-
+      
       console.log('[LessonPreview] ✅ Урок успешно создан:', response);
       console.log('[LessonPreview] 🆔 Новый lesson_id:', response.lesson_id);
-
-      // ═══════════════════════════════════════════
-      // ИСПРАВЛЕНИЕ: передаём lessonId в state
-      // ═══════════════════════════════════════════
+      
       navigate(`/lesson/${response.lesson_id}`, {
         state: {
           lessonId: response.lesson_id,
@@ -94,7 +95,6 @@ export default function LessonPreview() {
       });
     } catch (err) {
       console.error('[LessonPreview] ❌ Ошибка при создании урока:', err);
-
       let errorMsg = 'Не удалось начать урок. Попробуйте ещё раз.';
       if (err instanceof Error) {
         const msg = err.message;
@@ -104,7 +104,6 @@ export default function LessonPreview() {
         else if (msg.includes('llm')) errorMsg = 'Нейросеть временно недоступна. Попробуйте через минуту.';
         else errorMsg = msg;
       }
-
       setStartError(errorMsg);
     }
   };
@@ -155,7 +154,6 @@ export default function LessonPreview() {
             </Button>
           </div>
         </header>
-
         <main className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
           <Card className="p-8 text-center">
             {preview.state === 'resume' && (
@@ -169,7 +167,6 @@ export default function LessonPreview() {
                 </div>
               </>
             )}
-
             {preview.state === 'limit_reached' && (
               <>
                 <AlertCircle className="text-yellow-600 mx-auto mb-4" size={48} />
@@ -178,7 +175,6 @@ export default function LessonPreview() {
                 <Button onClick={() => navigate('/dashboard')}>На главную</Button>
               </>
             )}
-
             {preview.state === 'no_words' && (
               <>
                 <BookOpen className="text-gray-400 mx-auto mb-4" size={48} />
@@ -212,7 +208,6 @@ export default function LessonPreview() {
           <div className="w-20" />
         </div>
       </header>
-
       <main className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="space-y-8">
           <div className="text-center">

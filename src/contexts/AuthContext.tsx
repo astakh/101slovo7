@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { apiClient } from '../api/client';
+import { useQueryClient } from '@tanstack/react-query'; // <-- ДОБАВЛЕНО
 
 interface User {
   id: number;
@@ -22,6 +23,7 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
+  const queryClient = useQueryClient(); // <-- ДОБАВЛЕНО: инициализация хука
   const [user, setUser] = useState<User | null>(null);
   const [isInitializing, setIsInitializing] = useState(true);
 
@@ -52,6 +54,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     localStorage.setItem('access_token', data.access_token);
     const userData = await apiClient.getMe();
     setUser(userData);
+    queryClient.clear(); // <-- ДОБАВЛЕНО: очистка кэша при входе
   };
 
   const register = async (email: string, password: string) => {
@@ -59,11 +62,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     localStorage.setItem('access_token', data.access_token);
     const userData = await apiClient.getMe();
     setUser(userData);
+    queryClient.clear(); // <-- ДОБАВЛЕНО: очистка кэша при регистрации
   };
 
   const logout = () => {
     localStorage.removeItem('access_token');
     setUser(null);
+    queryClient.clear(); // <-- ДОБАВЛЕНО: очистка кэша при выходе
   };
 
   return (
