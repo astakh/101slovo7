@@ -1,6 +1,6 @@
 /**
-* API клиент для 101slovo
-*/
+ * API клиент для 101slovo
+ */
 import { API_URL } from '../config';
 
 class ApiError extends Error {
@@ -23,11 +23,21 @@ async function apiRequest<T>(
     'Content-Type': 'application/json',
     ...(options.headers as Record<string, string>),
   };
+
   if (token) {
     headers['Authorization'] = `Bearer ${token}`;
   }
 
-  const response = await fetch(`${API_URL}${path}`, {
+  // ═══════════════════════════════════════════
+  // ИСПРАВЛЕНИЕ: Безопасная склейка URL
+  // Убираем trailing slash у baseUrl и гарантируем leading slash у path
+  // Это предотвращает ошибку "//auth/login", которую браузер считал доменом
+  // ═══════════════════════════════════════════
+  const baseUrl = API_URL.endsWith('/') ? API_URL.slice(0, -1) : API_URL;
+  const cleanPath = path.startsWith('/') ? path : `/${path}`;
+  const url = `${baseUrl}${cleanPath}`;
+
+  const response = await fetch(url, {
     ...options,
     headers,
     credentials: 'include',
@@ -57,6 +67,7 @@ async function apiRequest<T>(
   if (response.status === 204) {
     return {} as T;
   }
+
   return response.json() as Promise<T>;
 }
 
@@ -161,8 +172,8 @@ export const apiClient = {
 
   // ─── Onboarding ─────────────────────────────────────────────────
   completeOnboarding(
-    level: string, 
-    dictionaryId: number, 
+    level: string,
+    dictionaryId: number,
     timezone: string,
     wordsPerLesson: number,
     dailyLimit: number
@@ -295,6 +306,7 @@ export const apiClient = {
     if (params.order_by) searchParams.append('order_by', params.order_by);
     if (params.order_dir) searchParams.append('order_dir', params.order_dir);
     if (params.search) searchParams.append('search', params.search);
+    
     return apiRequest<{
       table_name: string;
       columns: Array<{
